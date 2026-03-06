@@ -12,6 +12,10 @@ export default {
         "2xl": "1400px",
       },
     },
+    fontFamily: {
+      display: ['"Space Grotesk"', 'sans-serif'],
+      body: ['"Inter"', 'sans-serif'],
+    },
     extend: {
       colors: {
         border: "hsl(var(--border))",
@@ -46,6 +50,18 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        allowed: {
+          DEFAULT: "hsl(var(--allowed))",
+          foreground: "hsl(var(--allowed-foreground))",
+        },
+        forbidden: {
+          DEFAULT: "hsl(var(--forbidden))",
+          foreground: "hsl(var(--forbidden-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
