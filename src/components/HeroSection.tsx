@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-antwerp.jpg";
 
 const HeroSection = () => {
@@ -24,12 +25,20 @@ const HeroSection = () => {
           De regels voor klasse B scooters (max 25 km/u) in Antwerpen. 
           Eindelijk duidelijk overzicht — want op Google Maps zie je dit niet.
         </p>
-        <a
-          href="#regels"
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-lg font-display font-semibold text-lg hover:opacity-90 transition-opacity"
-        >
-          Bekijk de regels ↓
-        </a>
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <a
+            href="#regels"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-lg font-display font-semibold text-lg hover:opacity-90 transition-opacity"
+          >
+            Bekijk de regels ↓
+          </a>
+          <Link
+            to="/kaart"
+            className="inline-flex items-center gap-2 bg-card border border-primary/30 text-primary px-8 py-4 rounded-lg font-display font-semibold text-lg hover:bg-primary/10 transition-colors"
+          >
+            🗺️ Open de kaart
+          </Link>
+        </div>
       </div>
     </section>
   );
