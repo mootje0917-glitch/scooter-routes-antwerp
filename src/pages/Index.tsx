@@ -1,17 +1,9 @@
-import HeroSection from "@/components/HeroSection";
-import WhatIsClassB from "@/components/WhatIsClassB";
-import RulesSection from "@/components/RulesSection";
-import ZonesSection from "@/components/ZonesSection";
-import Footer from "@/components/Footer";
+import ScooterMap from "@/components/ScooterMap";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <HeroSection />
-      <WhatIsClassB />
-      <RulesSection />
-      <ZonesSection />
-      <Footer />
+    <div className="h-screen bg-background">
+      <ScooterMap />
     </div>
   );
 };
