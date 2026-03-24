@@ -155,15 +155,15 @@ const ScooterMap = () => {
 
   // Search locations - Antwerp focused
   const searchLocation = useCallback(async (query: string, field: "from" | "to") => {
-    if (query.length < 3) {
+    if (query.length < 2) {
       field === "from" ? setFromResults([]) : setToResults([]);
       return;
     }
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query + ", Antwerpen"
-        )}&limit=5&viewbox=4.25,51.12,4.55,51.32&bounded=1`
+          query
+        )}&limit=5&viewbox=4.25,51.12,4.55,51.32&bounded=0&countrycodes=be&addressdetails=1`
       );
       const data: SearchResult[] = await res.json();
       field === "from" ? setFromResults(data) : setToResults(data);
