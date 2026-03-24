@@ -55,7 +55,7 @@ const ProfilePage = () => {
         <Link to="/" className="text-foreground hover:text-primary transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h1 className="font-display font-semibold text-foreground">Profiel</h1>
+        <h1 className="font-display font-semibold text-foreground">B-Map Profiel</h1>
       </div>
 
       <div className="max-w-md mx-auto p-4 space-y-6">

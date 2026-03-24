@@ -175,7 +175,7 @@ const ScooterMap = () => {
     if (field === "from") setFromQuery(query);
     else setToQuery(query);
     clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => searchLocation(query, field), 400);
+    searchTimeoutRef.current = setTimeout(() => searchLocation(query, field), 600);
   };
 
   const selectResult = (result: SearchResult, field: "from" | "to") => {
