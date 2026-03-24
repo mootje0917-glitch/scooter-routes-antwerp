@@ -16,7 +16,15 @@ const ProfilePage = () => {
   // Settings
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
-  const [speedLimit, setSpeedLimit] = useState("25");
+
+  // Apply dark mode
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
