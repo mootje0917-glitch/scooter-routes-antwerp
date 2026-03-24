@@ -361,7 +361,7 @@ const ScooterMap = () => {
             onClick={() => setPanelMinimized(false)}
             className="bg-card border border-border rounded-xl shadow-lg px-4 py-3 flex items-center gap-2 text-sm font-display font-semibold text-foreground"
           >
-            🛴 Route <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            📍 B-Map <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </button>
         ) : (
           <div className="bg-card border border-border rounded-xl shadow-lg p-4 space-y-3">
