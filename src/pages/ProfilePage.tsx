@@ -92,21 +92,6 @@ const ProfilePage = () => {
 
           <SettingRow icon={<Bell className="w-4 h-4" />} label="Meldingen" checked={notifications} onChange={setNotifications} />
           <SettingRow icon={<Moon className="w-4 h-4" />} label="Donker thema" checked={darkMode} onChange={setDarkMode} />
-
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-3">
-              <Shield className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-foreground">Max snelheid</span>
-            </div>
-            <select
-              value={speedLimit}
-              onChange={(e) => setSpeedLimit(e.target.value)}
-              className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs text-foreground"
-            >
-              <option value="25">25 km/h</option>
-              <option value="45">45 km/h</option>
-            </select>
-          </div>
         </div>
 
         {/* Logout */}
