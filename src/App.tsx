@@ -32,7 +32,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (loading) return (
     <div className="h-screen bg-background flex items-center justify-center">
-      <span className="text-4xl animate-bounce">🛴</span>
+      <span className="text-4xl animate-bounce">📍</span>
     </div>
   );
 

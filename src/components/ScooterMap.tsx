@@ -468,7 +468,7 @@ const ScooterMap = () => {
 
             {!routeInfo && !loading && !error && (
               <p className="text-xs text-muted-foreground">
-                Zoek een route in Antwerpen — via fietspaden & lokale wegen.
+                Zoek een route in Antwerpen — via fietspaden & lokale wegen
               </p>
             )}
           </div>
