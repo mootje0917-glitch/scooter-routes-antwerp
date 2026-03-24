@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, User, Bell, Moon, Shield } from "lucide-react";
+import { ArrowLeft, LogOut, User, Bell, Moon } from "lucide-react";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -16,7 +16,15 @@ const ProfilePage = () => {
   // Settings
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
-  const [speedLimit, setSpeedLimit] = useState("25");
+
+  // Apply dark mode
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -47,7 +55,7 @@ const ProfilePage = () => {
         <Link to="/" className="text-foreground hover:text-primary transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h1 className="font-display font-semibold text-foreground">Profiel</h1>
+        <h1 className="font-display font-semibold text-foreground">B-Map Profiel</h1>
       </div>
 
       <div className="max-w-md mx-auto p-4 space-y-6">
@@ -84,21 +92,6 @@ const ProfilePage = () => {
 
           <SettingRow icon={<Bell className="w-4 h-4" />} label="Meldingen" checked={notifications} onChange={setNotifications} />
           <SettingRow icon={<Moon className="w-4 h-4" />} label="Donker thema" checked={darkMode} onChange={setDarkMode} />
-
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-3">
-              <Shield className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-foreground">Max snelheid</span>
-            </div>
-            <select
-              value={speedLimit}
-              onChange={(e) => setSpeedLimit(e.target.value)}
-              className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs text-foreground"
-            >
-              <option value="25">25 km/h</option>
-              <option value="45">45 km/h</option>
-            </select>
-          </div>
         </div>
 
         {/* Logout */}
