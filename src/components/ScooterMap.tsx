@@ -3,7 +3,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   Search, Navigation, X, Loader2, AlertTriangle,
-  ChevronRight, ChevronUp, ChevronDown, Play, Square, BookOpen
+  ChevronRight, ChevronUp, ChevronDown, Play, Square,
+  Crosshair, Volume2, VolumeX, User
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -19,8 +20,12 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-const BELGIUM_CENTER: [number, number] = [50.85, 4.35];
-const BELGIUM_ZOOM = 8;
+const ANTWERP_CENTER: [number, number] = [51.2194, 4.4025];
+const ANTWERP_ZOOM = 13;
+const ANTWERP_BOUNDS = L.latLngBounds(
+  [51.12, 4.25], // SW
+  [51.32, 4.55]  // NE
+);
 
 interface SearchResult {
   display_name: string;
@@ -79,6 +84,7 @@ const ScooterMap = () => {
   const routeLayerRef = useRef<L.Polyline | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const stepMarkerRef = useRef<L.Marker | null>(null);
+  const userLocationRef = useRef<[number, number] | null>(null);
 
   const [fromQuery, setFromQuery] = useState("");
   const [toQuery, setToQuery] = useState("");
@@ -96,23 +102,29 @@ const ScooterMap = () => {
   const [steps, setSteps] = useState<RouteStep[]>([]);
   const [navigating, setNavigating] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [showSteps, setShowSteps] = useState(false);
+  const [instructionsExpanded, setInstructionsExpanded] = useState(false);
   const [panelMinimized, setPanelMinimized] = useState(false);
 
-  // Initialize map
+  // TTS state
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+
+  // Initialize map - Antwerp only
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
     const map = L.map(mapContainerRef.current, {
-      center: BELGIUM_CENTER,
-      zoom: BELGIUM_ZOOM,
+      center: ANTWERP_CENTER,
+      zoom: ANTWERP_ZOOM,
       zoomControl: false,
+      maxBounds: ANTWERP_BOUNDS,
+      maxBoundsViscosity: 1.0,
+      minZoom: 12,
     });
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
       maxZoom: 19,
     }).addTo(map);
 
@@ -124,31 +136,44 @@ const ScooterMap = () => {
     };
   }, []);
 
-  // Search locations using Nominatim - Belgium wide
+  // TTS speak function
+  const speak = useCallback((text: string) => {
+    if (!ttsEnabled || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "nl-BE";
+    utterance.rate = 1;
+    window.speechSynthesis.speak(utterance);
+  }, [ttsEnabled]);
+
+  // Speak current step when it changes during navigation
+  useEffect(() => {
+    if (navigating && steps[currentStep]) {
+      speak(steps[currentStep].instruction);
+    }
+  }, [currentStep, navigating, steps, speak]);
+
+  // Search locations - Antwerp focused
   const searchLocation = useCallback(async (query: string, field: "from" | "to") => {
     if (query.length < 3) {
       field === "from" ? setFromResults([]) : setToResults([]);
       return;
     }
-
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query + ", Belgium"
-        )}&limit=5&countrycodes=be`
+          query + ", Antwerpen"
+        )}&limit=5&viewbox=4.25,51.12,4.55,51.32&bounded=1`
       );
       const data: SearchResult[] = await res.json();
       field === "from" ? setFromResults(data) : setToResults(data);
-    } catch {
-      // Silently fail
-    }
+    } catch { /* silent */ }
   }, []);
 
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const handleSearch = (query: string, field: "from" | "to") => {
     if (field === "from") setFromQuery(query);
     else setToQuery(query);
-
     clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => searchLocation(query, field), 400);
   };
@@ -156,15 +181,10 @@ const ScooterMap = () => {
   const selectResult = (result: SearchResult, field: "from" | "to") => {
     const coord: [number, number] = [parseFloat(result.lat), parseFloat(result.lon)];
     const shortName = result.display_name.split(",").slice(0, 2).join(",");
-
     if (field === "from") {
-      setFromCoord(coord);
-      setFromQuery(shortName);
-      setFromResults([]);
+      setFromCoord(coord); setFromQuery(shortName); setFromResults([]);
     } else {
-      setToCoord(coord);
-      setToQuery(shortName);
-      setToResults([]);
+      setToCoord(coord); setToQuery(shortName); setToResults([]);
     }
     setActiveField(null);
   };
@@ -175,29 +195,33 @@ const ScooterMap = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const coord: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        userLocationRef.current = coord;
         setFromCoord(coord);
         setFromQuery("📍 Mijn locatie");
         setUsingLocation(false);
       },
-      () => {
-        setError("Locatie niet beschikbaar");
-        setUsingLocation(false);
-      }
+      () => { setError("Locatie niet beschikbaar"); setUsingLocation(false); }
+    );
+  };
+
+  const centerOnUser = () => {
+    if (!navigator.geolocation || !mapRef.current) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coord: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        userLocationRef.current = coord;
+        mapRef.current?.flyTo(coord, 16, { duration: 0.8 });
+      },
+      () => setError("Locatie niet beschikbaar")
     );
   };
 
   // Calculate route
   const calculateRoute = useCallback(async () => {
     if (!fromCoord || !toCoord || !mapRef.current) return;
+    setLoading(true); setError(null); setRouteInfo(null);
+    setSteps([]); setNavigating(false); setCurrentStep(0);
 
-    setLoading(true);
-    setError(null);
-    setRouteInfo(null);
-    setSteps([]);
-    setNavigating(false);
-    setCurrentStep(0);
-
-    // Clear previous
     if (routeLayerRef.current) mapRef.current.removeLayer(routeLayerRef.current);
     markersRef.current.forEach((m) => mapRef.current?.removeLayer(m));
     markersRef.current = [];
@@ -208,27 +232,17 @@ const ScooterMap = () => {
         `https://router.project-osrm.org/route/v1/bike/${fromCoord[1]},${fromCoord[0]};${toCoord[1]},${toCoord[0]}?overview=full&geometries=geojson&steps=true`
       );
       const data = await res.json();
-
       if (data.code !== "Ok" || !data.routes?.length) {
-        setError("Geen route gevonden. Probeer andere locaties.");
-        setLoading(false);
-        return;
+        setError("Geen route gevonden."); setLoading(false); return;
       }
 
       const route = data.routes[0];
-      const coords = route.geometry.coordinates.map(
-        (c: [number, number]) => [c[1], c[0]] as [number, number]
-      );
+      const coords = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
 
-      // Draw route
       routeLayerRef.current = L.polyline(coords, {
-        color: "hsl(160, 60%, 45%)",
-        weight: 5,
-        opacity: 0.85,
-        lineJoin: "round",
+        color: "hsl(160, 60%, 45%)", weight: 5, opacity: 0.85, lineJoin: "round",
       }).addTo(mapRef.current);
 
-      // Markers
       const startIcon = L.divIcon({
         html: `<div style="width:20px;height:20px;background:hsl(160,60%,45%);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>`,
         iconSize: [20, 20], iconAnchor: [10, 10], className: "",
@@ -245,7 +259,6 @@ const ScooterMap = () => {
 
       mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [80, 80] });
 
-      // Parse steps
       const routeSteps: RouteStep[] = route.legs[0].steps.map((s: any) => ({
         instruction: "",
         distance: s.distance,
@@ -254,12 +267,7 @@ const ScooterMap = () => {
         maneuver: s.maneuver,
         coord: [s.maneuver.location[1], s.maneuver.location[0]] as [number, number],
       }));
-
-      // Generate Dutch instructions
-      routeSteps.forEach((step) => {
-        step.instruction = formatInstruction(step);
-      });
-
+      routeSteps.forEach((step) => { step.instruction = formatInstruction(step); });
       setSteps(routeSteps);
 
       const distKm = (route.distance / 1000).toFixed(1);
@@ -268,7 +276,6 @@ const ScooterMap = () => {
     } catch {
       setError("Fout bij het berekenen van de route.");
     }
-
     setLoading(false);
   }, [fromCoord, toCoord]);
 
@@ -279,92 +286,82 @@ const ScooterMap = () => {
   // Navigation: zoom to current step
   useEffect(() => {
     if (!navigating || !mapRef.current || steps.length === 0) return;
-
     const step = steps[currentStep];
     if (!step) return;
-
-    // Remove old step marker
     if (stepMarkerRef.current) mapRef.current.removeLayer(stepMarkerRef.current);
-
     const icon = L.divIcon({
       html: `<div style="width:32px;height:32px;background:hsl(160,60%,45%);border:3px solid white;border-radius:50%;box-shadow:0 3px 12px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:16px">${getManeuverIcon(step.maneuver.type, step.maneuver.modifier)}</div>`,
       iconSize: [32, 32], iconAnchor: [16, 16], className: "",
     });
-
     stepMarkerRef.current = L.marker(step.coord, { icon }).addTo(mapRef.current);
     mapRef.current.flyTo(step.coord, 17, { duration: 0.8 });
   }, [navigating, currentStep, steps]);
 
   const startNavigation = () => {
-    setNavigating(true);
-    setCurrentStep(0);
-    setShowSteps(true);
-    setPanelMinimized(true);
+    setNavigating(true); setCurrentStep(0); setInstructionsExpanded(false); setPanelMinimized(true);
   };
-
   const stopNavigation = () => {
-    setNavigating(false);
-    setCurrentStep(0);
-    if (stepMarkerRef.current && mapRef.current) {
-      mapRef.current.removeLayer(stepMarkerRef.current);
-      stepMarkerRef.current = null;
-    }
-    if (routeLayerRef.current && mapRef.current) {
-      mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [80, 80] });
-    }
+    setNavigating(false); setCurrentStep(0);
+    window.speechSynthesis?.cancel();
+    if (stepMarkerRef.current && mapRef.current) { mapRef.current.removeLayer(stepMarkerRef.current); stepMarkerRef.current = null; }
+    if (routeLayerRef.current && mapRef.current) mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [80, 80] });
     setPanelMinimized(false);
   };
-
-  const nextStep = () => {
-    if (currentStep < steps.length - 1) setCurrentStep((s) => s + 1);
-  };
-  const prevStep = () => {
-    if (currentStep > 0) setCurrentStep((s) => s - 1);
-  };
+  const nextStep = () => { if (currentStep < steps.length - 1) setCurrentStep((s) => s + 1); };
+  const prevStep = () => { if (currentStep > 0) setCurrentStep((s) => s - 1); };
 
   const clearRoute = () => {
-    if (routeLayerRef.current && mapRef.current) {
-      mapRef.current.removeLayer(routeLayerRef.current);
-      routeLayerRef.current = null;
-    }
+    if (routeLayerRef.current && mapRef.current) { mapRef.current.removeLayer(routeLayerRef.current); routeLayerRef.current = null; }
     markersRef.current.forEach((m) => mapRef.current?.removeLayer(m));
     markersRef.current = [];
-    if (stepMarkerRef.current && mapRef.current) {
-      mapRef.current.removeLayer(stepMarkerRef.current);
-      stepMarkerRef.current = null;
-    }
+    if (stepMarkerRef.current && mapRef.current) { mapRef.current.removeLayer(stepMarkerRef.current); stepMarkerRef.current = null; }
     setFromQuery(""); setToQuery("");
     setFromCoord(null); setToCoord(null);
     setRouteInfo(null); setError(null);
     setSteps([]); setNavigating(false); setCurrentStep(0);
-    setShowSteps(false); setPanelMinimized(false);
-    if (mapRef.current) mapRef.current.flyTo(BELGIUM_CENTER, BELGIUM_ZOOM, { duration: 0.8 });
+    setInstructionsExpanded(false); setPanelMinimized(false);
+    window.speechSynthesis?.cancel();
+    if (mapRef.current) mapRef.current.flyTo(ANTWERP_CENTER, ANTWERP_ZOOM, { duration: 0.8 });
+  };
+
+  const toggleTts = () => {
+    if (ttsEnabled) window.speechSynthesis?.cancel();
+    setTtsEnabled(!ttsEnabled);
   };
 
   return (
     <div className="w-full h-full relative">
       <div ref={mapContainerRef} className="w-full h-full" />
 
-      {/* Top-right: Rules link */}
+      {/* Profile link - top right */}
       <div className="absolute top-4 right-4 z-[1000]">
         <Link
-          to="/regels"
-          className="flex items-center gap-2 bg-card/90 backdrop-blur border border-border rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-card transition-colors shadow-lg"
+          to="/profiel"
+          className="flex items-center justify-center w-10 h-10 bg-card/90 backdrop-blur border border-border rounded-full text-foreground hover:bg-card transition-colors shadow-lg"
         >
-          <BookOpen className="w-4 h-4 text-primary" />
-          Regels
+          <User className="w-5 h-5" />
         </Link>
       </div>
 
+      {/* Center on location button */}
+      <div className="absolute bottom-24 right-4 z-[1000]">
+        <button
+          onClick={centerOnUser}
+          className="flex items-center justify-center w-10 h-10 bg-card/90 backdrop-blur border border-border rounded-full text-foreground hover:bg-card transition-colors shadow-lg"
+          title="Centreer op mijn locatie"
+        >
+          <Crosshair className="w-5 h-5" />
+        </button>
+      </div>
+
       {/* Search panel - top left */}
-      <div className={`absolute top-4 left-4 ${panelMinimized ? "right-auto w-auto" : "right-4 md:right-auto md:w-96"} z-[1000]`}>
+      <div className={`absolute top-4 left-4 ${panelMinimized ? "right-auto w-auto" : "right-16 md:right-auto md:w-96"} z-[1000]`}>
         {panelMinimized ? (
           <button
             onClick={() => setPanelMinimized(false)}
             className="bg-card border border-border rounded-xl shadow-lg px-4 py-3 flex items-center gap-2 text-sm font-display font-semibold text-foreground"
           >
-            🛴 Route
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            🛴 Route <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </button>
         ) : (
           <div className="bg-card border border-border rounded-xl shadow-lg p-4 space-y-3">
@@ -389,14 +386,13 @@ const ScooterMap = () => {
               <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
                 <div className="w-3 h-3 rounded-full bg-primary flex-shrink-0" />
                 <input
-                  type="text"
-                  value={fromQuery}
+                  type="text" value={fromQuery}
                   onChange={(e) => handleSearch(e.target.value, "from")}
                   onFocus={() => setActiveField("from")}
                   placeholder="Vertrekpunt..."
                   className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full"
                 />
-                <button onClick={useMyLocation} className="text-muted-foreground hover:text-primary flex-shrink-0" title="Gebruik mijn locatie">
+                <button onClick={useMyLocation} className="text-muted-foreground hover:text-primary flex-shrink-0" title="Mijn locatie">
                   {usingLocation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
                 </button>
               </div>
@@ -417,8 +413,7 @@ const ScooterMap = () => {
               <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
                 <div className="w-3 h-3 rounded-full bg-destructive flex-shrink-0" />
                 <input
-                  type="text"
-                  value={toQuery}
+                  type="text" value={toQuery}
                   onChange={(e) => handleSearch(e.target.value, "to")}
                   onFocus={() => setActiveField("to")}
                   placeholder="Bestemming..."
@@ -443,14 +438,12 @@ const ScooterMap = () => {
                 <Loader2 className="w-4 h-4 animate-spin" /> Route berekenen...
               </div>
             )}
-
             {error && (
               <div className="flex items-center gap-2 text-destructive text-sm">
                 <AlertTriangle className="w-4 h-4" /> {error}
               </div>
             )}
 
-            {/* Route info + Start button */}
             {routeInfo && !navigating && (
               <>
                 <div className="flex items-center gap-4 bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
@@ -468,118 +461,102 @@ const ScooterMap = () => {
                   onClick={startNavigation}
                   className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg px-4 py-3 font-display font-semibold text-sm hover:opacity-90 transition-opacity"
                 >
-                  <Play className="w-4 h-4" />
-                  Start route
+                  <Play className="w-4 h-4" /> Start route
                 </button>
               </>
             )}
 
             {!routeInfo && !loading && !error && (
               <p className="text-xs text-muted-foreground">
-                Voer een vertrekpunt en bestemming in — route via fietspaden & lokale wegen.
+                Zoek een route in Antwerpen — via fietspaden & lokale wegen.
               </p>
             )}
           </div>
         )}
       </div>
 
-      {/* Navigation overlay - bottom */}
+      {/* Navigation bottom sheet */}
       {navigating && steps.length > 0 && (
-        <div className="absolute bottom-0 left-0 right-0 z-[1000]">
-          {/* Current step card */}
-          <div className="mx-4 mb-4">
-            <div className="bg-card border border-border rounded-xl shadow-lg overflow-hidden">
-              {/* Current instruction */}
-              <div className="p-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl flex-shrink-0 mt-0.5">
-                    {getManeuverIcon(steps[currentStep].maneuver.type, steps[currentStep].maneuver.modifier)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-semibold text-foreground text-sm">
-                      {steps[currentStep].instruction}
+        <div
+          className={`absolute bottom-0 left-0 right-0 z-[1000] transition-all duration-300 ${
+            instructionsExpanded ? "top-1/3" : ""
+          }`}
+        >
+          <div className="bg-card border-t border-border rounded-t-2xl shadow-2xl h-full flex flex-col">
+            {/* Swipe handle */}
+            <button
+              onClick={() => setInstructionsExpanded(!instructionsExpanded)}
+              className="w-full flex justify-center py-2 cursor-grab"
+            >
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/40" />
+            </button>
+
+            {/* Current instruction - compact */}
+            <div className="px-4 pb-2">
+              <div className="flex items-center gap-3">
+                <span className="text-xl flex-shrink-0">
+                  {getManeuverIcon(steps[currentStep].maneuver.type, steps[currentStep].maneuver.modifier)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-display font-semibold text-foreground text-xs leading-tight">
+                    {steps[currentStep].instruction}
+                  </p>
+                  {steps[currentStep].distance > 0 && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {steps[currentStep].distance < 1000
+                        ? `${Math.round(steps[currentStep].distance)} m`
+                        : `${(steps[currentStep].distance / 1000).toFixed(1)} km`}
                     </p>
-                    {steps[currentStep].distance > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {steps[currentStep].distance < 1000
-                          ? `${Math.round(steps[currentStep].distance)} m`
-                          : `${(steps[currentStep].distance / 1000).toFixed(1)} km`}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {currentStep + 1}/{steps.length}
-                  </span>
+                  )}
                 </div>
+                <span className="text-[10px] text-muted-foreground">{currentStep + 1}/{steps.length}</span>
               </div>
-
-              {/* Nav controls */}
-              <div className="flex border-t border-border">
-                <button
-                  onClick={prevStep}
-                  disabled={currentStep === 0}
-                  className="flex-1 flex items-center justify-center gap-1 py-3 text-sm text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-r border-border"
-                >
-                  <ChevronRight className="w-4 h-4 rotate-180" /> Vorige
-                </button>
-                <button
-                  onClick={stopNavigation}
-                  className="flex items-center justify-center gap-1 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors border-r border-border"
-                >
-                  <Square className="w-3 h-3" /> Stop
-                </button>
-                <button
-                  onClick={() => setShowSteps(!showSteps)}
-                  className="flex items-center justify-center px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors border-r border-border"
-                >
-                  {showSteps ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                </button>
-                <button
-                  onClick={nextStep}
-                  disabled={currentStep === steps.length - 1}
-                  className="flex-1 flex items-center justify-center gap-1 py-3 text-sm text-primary font-medium hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  Volgende <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* All steps list */}
-              {showSteps && (
-                <div className="border-t border-border max-h-48 overflow-y-auto">
-                  {steps.map((step, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentStep(i)}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors border-b border-border last:border-0 ${
-                        i === currentStep ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary"
-                      } ${i < currentStep ? "opacity-50" : ""}`}
-                    >
-                      <span className="text-base flex-shrink-0">
-                        {getManeuverIcon(step.maneuver.type, step.maneuver.modifier)}
-                      </span>
-                      <span className="flex-1 min-w-0 truncate">{step.instruction}</span>
-                      {step.distance > 0 && (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {step.distance < 1000
-                            ? `${Math.round(step.distance)} m`
-                            : `${(step.distance / 1000).toFixed(1)} km`}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Legend - only when not navigating */}
-      {!navigating && (
-        <div className="absolute bottom-6 left-4 z-[1000] bg-card/90 backdrop-blur border border-border rounded-lg px-3 py-2 text-xs space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-1 rounded bg-primary" />
-            <span className="text-foreground">Scooter route</span>
+            {/* Controls row */}
+            <div className="flex border-t border-border">
+              <button onClick={prevStep} disabled={currentStep === 0}
+                className="flex-1 flex items-center justify-center gap-1 py-2.5 text-xs text-foreground hover:bg-secondary disabled:opacity-30 transition-colors border-r border-border">
+                <ChevronRight className="w-3 h-3 rotate-180" /> Vorige
+              </button>
+              <button onClick={stopNavigation}
+                className="flex items-center justify-center gap-1 px-3 py-2.5 text-xs text-destructive hover:bg-destructive/10 transition-colors border-r border-border">
+                <Square className="w-3 h-3" />
+              </button>
+              <button onClick={toggleTts}
+                className="flex items-center justify-center px-3 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors border-r border-border"
+                title={ttsEnabled ? "Geluid dempen" : "Geluid aan"}
+              >
+                {ttsEnabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4" />}
+              </button>
+              <button onClick={nextStep} disabled={currentStep === steps.length - 1}
+                className="flex-1 flex items-center justify-center gap-1 py-2.5 text-xs text-primary font-medium hover:bg-primary/10 disabled:opacity-30 transition-colors">
+                Volgende <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Expanded: all steps */}
+            {instructionsExpanded && (
+              <div className="flex-1 overflow-y-auto border-t border-border">
+                {steps.map((step, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentStep(i)}
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-left text-xs transition-colors border-b border-border last:border-0 ${
+                      i === currentStep ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary"
+                    } ${i < currentStep ? "opacity-40" : ""}`}
+                  >
+                    <span className="text-sm flex-shrink-0">{getManeuverIcon(step.maneuver.type, step.maneuver.modifier)}</span>
+                    <span className="flex-1 min-w-0 truncate">{step.instruction}</span>
+                    {step.distance > 0 && (
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        {step.distance < 1000 ? `${Math.round(step.distance)} m` : `${(step.distance / 1000).toFixed(1)} km`}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
