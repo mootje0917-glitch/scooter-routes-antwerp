@@ -366,7 +366,7 @@ const ScooterMap = () => {
         ) : (
           <div className="bg-card border border-border rounded-xl shadow-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-display font-semibold text-sm text-foreground">🛴 Scooter Route</span>
+              <span className="font-display font-semibold text-sm text-foreground">📍 B-Map</span>
               <div className="flex items-center gap-1">
                 {navigating && (
                   <button onClick={() => setPanelMinimized(true)} className="text-muted-foreground hover:text-foreground p-1">
