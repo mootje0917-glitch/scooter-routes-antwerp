@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogOut, User, Bell, Moon, Shield } from "lucide-react";
+import { ArrowLeft, LogOut, User, Bell, Moon } from "lucide-react";
 
 const ProfilePage = () => {
   const navigate = useNavigate();

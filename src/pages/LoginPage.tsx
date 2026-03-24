@@ -50,7 +50,7 @@ const LoginPage = () => {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <span className="text-4xl">🛴</span>
-          <h1 className="font-display text-2xl font-bold text-foreground mt-3">ScooterRoute</h1>
+          <h1 className="font-display text-2xl font-bold text-foreground mt-3">B-Map</h1>
           <p className="text-sm text-muted-foreground mt-1">Antwerpen</p>
         </div>
 
