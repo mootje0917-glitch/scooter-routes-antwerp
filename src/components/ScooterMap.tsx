@@ -136,22 +136,7 @@ const ScooterMap = () => {
     };
   }, []);
 
-  // TTS speak function
-  const speak = useCallback((text: string) => {
-    if (!ttsEnabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "nl-BE";
-    utterance.rate = 1;
-    window.speechSynthesis.speak(utterance);
-  }, [ttsEnabled]);
-
-  // Speak current step when it changes during navigation
-  useEffect(() => {
-    if (navigating && steps[currentStep]) {
-      speak(steps[currentStep].instruction);
-    }
-  }, [currentStep, navigating, steps, speak]);
+  // Audio is UI-only (no real TTS)
 
   // Search locations - Antwerp focused
   const searchLocation = useCallback(async (query: string, field: "from" | "to") => {
@@ -162,10 +147,15 @@ const ScooterMap = () => {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query
-        )}&limit=5&viewbox=4.25,51.12,4.55,51.32&bounded=0&countrycodes=be&addressdetails=1`
+          query + ", Antwerpen"
+        )}&limit=8&viewbox=4.25,51.12,4.55,51.32&bounded=1&countrycodes=be&addressdetails=1`
       );
-      const data: SearchResult[] = await res.json();
+      const raw: SearchResult[] = await res.json();
+      const data = raw.filter((r) => {
+        const lat = parseFloat(r.lat);
+        const lon = parseFloat(r.lon);
+        return lat >= 51.12 && lat <= 51.32 && lon >= 4.25 && lon <= 4.55;
+      });
       field === "from" ? setFromResults(data) : setToResults(data);
     } catch { /* silent */ }
   }, []);
@@ -302,7 +292,6 @@ const ScooterMap = () => {
   };
   const stopNavigation = () => {
     setNavigating(false); setCurrentStep(0);
-    window.speechSynthesis?.cancel();
     if (stepMarkerRef.current && mapRef.current) { mapRef.current.removeLayer(stepMarkerRef.current); stepMarkerRef.current = null; }
     if (routeLayerRef.current && mapRef.current) mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [80, 80] });
     setPanelMinimized(false);
@@ -320,14 +309,10 @@ const ScooterMap = () => {
     setRouteInfo(null); setError(null);
     setSteps([]); setNavigating(false); setCurrentStep(0);
     setInstructionsExpanded(false); setPanelMinimized(false);
-    window.speechSynthesis?.cancel();
     if (mapRef.current) mapRef.current.flyTo(ANTWERP_CENTER, ANTWERP_ZOOM, { duration: 0.8 });
   };
 
-  const toggleTts = () => {
-    if (ttsEnabled) window.speechSynthesis?.cancel();
-    setTtsEnabled(!ttsEnabled);
-  };
+  const toggleTts = () => setTtsEnabled(!ttsEnabled);
 
   return (
     <div className="w-full h-full relative">
