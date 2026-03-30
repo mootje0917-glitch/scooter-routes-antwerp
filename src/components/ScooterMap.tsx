@@ -312,10 +312,7 @@ const ScooterMap = () => {
     if (mapRef.current) mapRef.current.flyTo(ANTWERP_CENTER, ANTWERP_ZOOM, { duration: 0.8 });
   };
 
-  const toggleTts = () => {
-    if (ttsEnabled) window.speechSynthesis?.cancel();
-    setTtsEnabled(!ttsEnabled);
-  };
+  const toggleTts = () => setTtsEnabled(!ttsEnabled);
 
   return (
     <div className="w-full h-full relative">
