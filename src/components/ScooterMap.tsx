@@ -136,22 +136,7 @@ const ScooterMap = () => {
     };
   }, []);
 
-  // TTS speak function
-  const speak = useCallback((text: string) => {
-    if (!ttsEnabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "nl-BE";
-    utterance.rate = 1;
-    window.speechSynthesis.speak(utterance);
-  }, [ttsEnabled]);
-
-  // Speak current step when it changes during navigation
-  useEffect(() => {
-    if (navigating && steps[currentStep]) {
-      speak(steps[currentStep].instruction);
-    }
-  }, [currentStep, navigating, steps, speak]);
+  // Audio is UI-only (no real TTS)
 
   // Search locations - Antwerp focused
   const searchLocation = useCallback(async (query: string, field: "from" | "to") => {
