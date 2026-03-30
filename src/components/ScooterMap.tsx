@@ -162,10 +162,15 @@ const ScooterMap = () => {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query
-        )}&limit=5&viewbox=4.25,51.12,4.55,51.32&bounded=0&countrycodes=be&addressdetails=1`
+          query + ", Antwerpen"
+        )}&limit=8&viewbox=4.25,51.12,4.55,51.32&bounded=1&countrycodes=be&addressdetails=1`
       );
-      const data: SearchResult[] = await res.json();
+      const raw: SearchResult[] = await res.json();
+      const data = raw.filter((r) => {
+        const lat = parseFloat(r.lat);
+        const lon = parseFloat(r.lon);
+        return lat >= 51.12 && lat <= 51.32 && lon >= 4.25 && lon <= 4.55;
+      });
       field === "from" ? setFromResults(data) : setToResults(data);
     } catch { /* silent */ }
   }, []);
