@@ -309,7 +309,6 @@ const ScooterMap = () => {
     setRouteInfo(null); setError(null);
     setSteps([]); setNavigating(false); setCurrentStep(0);
     setInstructionsExpanded(false); setPanelMinimized(false);
-    window.speechSynthesis?.cancel();
     if (mapRef.current) mapRef.current.flyTo(ANTWERP_CENTER, ANTWERP_ZOOM, { duration: 0.8 });
   };
 
