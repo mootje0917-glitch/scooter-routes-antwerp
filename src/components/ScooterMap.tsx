@@ -292,7 +292,6 @@ const ScooterMap = () => {
   };
   const stopNavigation = () => {
     setNavigating(false); setCurrentStep(0);
-    window.speechSynthesis?.cancel();
     if (stepMarkerRef.current && mapRef.current) { mapRef.current.removeLayer(stepMarkerRef.current); stepMarkerRef.current = null; }
     if (routeLayerRef.current && mapRef.current) mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [80, 80] });
     setPanelMinimized(false);
