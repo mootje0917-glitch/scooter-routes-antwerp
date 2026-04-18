@@ -246,11 +246,33 @@ const ScooterMap = () => {
       }
 
       const route = data.routes[0];
-      const coords = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
 
-      routeLayerRef.current = L.polyline(coords, {
-        color: "hsl(160, 60%, 45%)", weight: 5, opacity: 0.85, lineJoin: "round",
-      }).addTo(mapRef.current);
+      // Color map per road type (HSL from design tokens)
+      const ROAD_COLORS: Record<RoadType, string> = {
+        cycle:   "hsl(160, 60%, 45%)", // groen — fietspad
+        road:    "hsl(210, 80%, 55%)", // blauw — gewone weg
+        foot:    "hsl(40, 90%, 55%)",  // amber — voetpad
+        unknown: "hsl(210, 12%, 55%)", // grijs
+      };
+
+      // Build per-step colored polylines
+      const group = L.layerGroup();
+      route.legs[0].steps.forEach((s: any) => {
+        const segCoords: [number, number][] = (s.geometry?.coordinates || []).map(
+          (c: [number, number]) => [c[1], c[0]]
+        );
+        if (segCoords.length < 2) return;
+        const rt = getRoadType(s.name || "");
+        L.polyline(segCoords, {
+          color: ROAD_COLORS[rt],
+          weight: 6,
+          opacity: 0.9,
+          lineJoin: "round",
+          lineCap: "round",
+        }).addTo(group);
+      });
+      group.addTo(mapRef.current);
+      routeLayerRef.current = group;
 
       const startIcon = L.divIcon({
         html: `<div style="width:20px;height:20px;background:hsl(160,60%,45%);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>`,
@@ -266,7 +288,10 @@ const ScooterMap = () => {
         L.marker(toCoord, { icon: endIcon }).addTo(mapRef.current).bindPopup("📍 Bestemming")
       );
 
-      mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [80, 80] });
+      const allCoords: [number, number][] = route.geometry.coordinates.map(
+        (c: [number, number]) => [c[1], c[0]] as [number, number]
+      );
+      mapRef.current.fitBounds(L.latLngBounds(allCoords), { padding: [80, 80] });
 
       const routeSteps: RouteStep[] = route.legs[0].steps.map((s: any) => ({
         instruction: "",
