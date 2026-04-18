@@ -550,26 +550,41 @@ const ScooterMap = () => {
               </button>
             </div>
 
-            {/* Expanded: all steps */}
+            {/* Expanded: legend + all steps */}
             {instructionsExpanded && (
               <div className="flex-1 overflow-y-auto border-t border-border">
-                {steps.map((step, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentStep(i)}
-                    className={`w-full flex items-center gap-3 px-4 py-2 text-left text-xs transition-colors border-b border-border last:border-0 ${
-                      i === currentStep ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary"
-                    } ${i < currentStep ? "opacity-40" : ""}`}
-                  >
-                    <span className="text-sm flex-shrink-0">{getManeuverIcon(step.maneuver.type, step.maneuver.modifier)}</span>
-                    <span className="flex-1 min-w-0 truncate">{step.instruction}</span>
-                    {step.distance > 0 && (
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        {step.distance < 1000 ? `${Math.round(step.distance)} m` : `${(step.distance / 1000).toFixed(1)} km`}
+                <div className="flex items-center gap-2 px-4 py-2 bg-secondary/40 border-b border-border text-[10px]">
+                  <span className="text-muted-foreground">Type:</span>
+                  {(["cycle","road","foot"] as RoadType[]).map((t) => (
+                    <span key={t} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${ROAD_LABELS[t].cls}`}>
+                      <span>{ROAD_LABELS[t].icon}</span>{ROAD_LABELS[t].label}
+                    </span>
+                  ))}
+                </div>
+                {steps.map((step, i) => {
+                  const rt = getRoadType(step.name);
+                  const meta = ROAD_LABELS[rt];
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentStep(i)}
+                      className={`w-full flex items-center gap-3 px-4 py-2 text-left text-xs transition-colors border-b border-border last:border-0 ${
+                        i === currentStep ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary"
+                      } ${i < currentStep ? "opacity-40" : ""}`}
+                    >
+                      <span className="text-sm flex-shrink-0">{getManeuverIcon(step.maneuver.type, step.maneuver.modifier)}</span>
+                      <span className="flex-1 min-w-0 truncate">{step.instruction}</span>
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-medium ${meta.cls}`}>
+                        <span>{meta.icon}</span>{meta.label}
                       </span>
-                    )}
-                  </button>
-                ))}
+                      {step.distance > 0 && (
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          {step.distance < 1000 ? `${Math.round(step.distance)} m` : `${(step.distance / 1000).toFixed(1)} km`}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
