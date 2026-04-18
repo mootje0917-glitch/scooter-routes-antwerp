@@ -38,6 +38,7 @@ interface RouteStep {
   distance: number;
   duration: number;
   name: string;
+  ref?: string;
   maneuver: { type: string; modifier?: string };
   coord: [number, number];
 }
@@ -56,28 +57,32 @@ const getManeuverIcon = (type: string, modifier?: string) => {
   return "⬆️";
 };
 
-type RoadType = "cycle" | "foot" | "road" | "unknown";
+type RoadType = "cycle" | "foot" | "road" | "highway" | "link" | "unknown";
 
-const getRoadType = (name: string): RoadType => {
+const getRoadType = (name: string, ref?: string): RoadType => {
   const n = (name || "").toLowerCase();
-  if (!n) return "unknown";
+  const r = (ref || "").toLowerCase();
+  // Snelweg / autostrade detectie via ref (E17, A12, R1, N1...)
+  if (/^(e\d+|a\d+|r\d+)$/.test(r.trim())) return "highway";
+  if (!n && !r) return "link";
   if (/(fietspad|fietsroute|fietsweg|fietsstraat|cycle)/.test(n)) return "cycle";
-  if (/(voetpad|wandelpad|voetgangers|pad$|\bpad\b|footway)/.test(n)) return "foot";
-  // Common Dutch road suffixes → regular road
-  if (/(straat|laan|weg|baan|ring|plein|kaai|brug|tunnel|dreef|steenweg|boulevard|avenue|chauss)/.test(n)) return "road";
-  return "unknown";
+  if (/(voetpad|wandelpad|voetgangers|footway)/.test(n)) return "foot";
+  if (/(straat|laan|weg|baan|ring|plein|kaai|brug|tunnel|dreef|steenweg|boulevard|avenue|chauss|lei|markt|hof|dijk)/.test(n)) return "road";
+  return "link";
 };
 
 const ROAD_LABELS: Record<RoadType, { label: string; icon: string; cls: string }> = {
-  cycle:   { label: "Fietspad", icon: "🚲", cls: "bg-allowed/20 text-allowed-foreground border-allowed/40" },
-  foot:    { label: "Voetpad",  icon: "🚶", cls: "bg-warning/20 text-warning-foreground border-warning/40" },
-  road:    { label: "Weg",      icon: "🛣️", cls: "bg-secondary text-secondary-foreground border-border" },
-  unknown: { label: "Onbekend", icon: "❔", cls: "bg-muted text-muted-foreground border-border" },
+  cycle:   { label: "Fietspad",  icon: "🚲", cls: "bg-allowed/20 text-allowed-foreground border-allowed/40" },
+  foot:    { label: "Voetpad",   icon: "🚶", cls: "bg-warning/20 text-warning-foreground border-warning/40" },
+  road:    { label: "Weg",       icon: "🛣️", cls: "bg-secondary text-secondary-foreground border-border" },
+  highway: { label: "Snelweg ⚠", icon: "🚫", cls: "bg-destructive/20 text-destructive border-destructive/40" },
+  link:    { label: "Verbinding",icon: "↪️", cls: "bg-muted text-muted-foreground border-border" },
+  unknown: { label: "Onbekend",  icon: "❔", cls: "bg-muted text-muted-foreground border-border" },
 };
 
 const formatInstruction = (step: RouteStep) => {
   const { type, modifier } = step.maneuver;
-  const name = step.name || "onbekende weg";
+  const name = step.name || step.ref || "verbindingsweg";
 
   if (type === "depart") return `Vertrek via ${name}`;
   if (type === "arrive") return "Je bent aangekomen!";
@@ -237,8 +242,9 @@ const ScooterMap = () => {
     if (stepMarkerRef.current) { mapRef.current.removeLayer(stepMarkerRef.current); stepMarkerRef.current = null; }
 
     try {
+      // OSM-DE routed-bike: echte fiets-profiel, vermijdt snelwegen/autostrades
       const res = await fetch(
-        `https://router.project-osrm.org/route/v1/bike/${fromCoord[1]},${fromCoord[0]};${toCoord[1]},${toCoord[0]}?overview=full&geometries=geojson&steps=true`
+        `https://routing.openstreetmap.de/routed-bike/route/v1/bike/${fromCoord[1]},${fromCoord[0]};${toCoord[1]},${toCoord[0]}?overview=full&geometries=geojson&steps=true`
       );
       const data = await res.json();
       if (data.code !== "Ok" || !data.routes?.length) {
@@ -252,27 +258,35 @@ const ScooterMap = () => {
         cycle:   "hsl(160, 60%, 45%)", // groen — fietspad
         road:    "hsl(210, 80%, 55%)", // blauw — gewone weg
         foot:    "hsl(40, 90%, 55%)",  // amber — voetpad
-        unknown: "hsl(210, 12%, 55%)", // grijs
+        highway: "hsl(0, 72%, 55%)",   // rood — verboden
+        link:    "hsl(210, 12%, 55%)", // grijs — verbinding
+        unknown: "hsl(210, 12%, 55%)",
       };
 
-      // Build per-step colored polylines
+      // Build per-step colored polylines + detect highway segments
       const group = L.layerGroup();
+      let hasHighway = false;
       route.legs[0].steps.forEach((s: any) => {
         const segCoords: [number, number][] = (s.geometry?.coordinates || []).map(
           (c: [number, number]) => [c[1], c[0]]
         );
         if (segCoords.length < 2) return;
-        const rt = getRoadType(s.name || "");
+        const rt = getRoadType(s.name || "", s.ref);
+        if (rt === "highway") hasHighway = true;
         L.polyline(segCoords, {
           color: ROAD_COLORS[rt],
           weight: 6,
           opacity: 0.9,
           lineJoin: "round",
           lineCap: "round",
+          dashArray: rt === "highway" ? "8 6" : undefined,
         }).addTo(group);
       });
       group.addTo(mapRef.current);
       routeLayerRef.current = group;
+      if (hasHighway) {
+        setError("⚠ Deze route bevat een snelweg/autostrade — niet toegelaten voor scooters.");
+      }
 
       const startIcon = L.divIcon({
         html: `<div style="width:20px;height:20px;background:hsl(160,60%,45%);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>`,
@@ -298,6 +312,7 @@ const ScooterMap = () => {
         distance: s.distance,
         duration: s.duration,
         name: s.name || "",
+        ref: s.ref || undefined,
         maneuver: s.maneuver,
         coord: [s.maneuver.location[1], s.maneuver.location[0]] as [number, number],
       }));
@@ -538,7 +553,7 @@ const ScooterMap = () => {
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     {(() => {
-                      const rt = getRoadType(steps[currentStep].name);
+                      const rt = getRoadType(steps[currentStep].name, steps[currentStep].ref);
                       const meta = ROAD_LABELS[rt];
                       return (
                         <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${meta.cls}`}>
@@ -593,7 +608,7 @@ const ScooterMap = () => {
                   ))}
                 </div>
                 {steps.map((step, i) => {
-                  const rt = getRoadType(step.name);
+                  const rt = getRoadType(step.name, step.ref);
                   const meta = ROAD_LABELS[rt];
                   return (
                     <button
