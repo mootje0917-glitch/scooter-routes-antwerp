@@ -82,7 +82,7 @@ const ROAD_LABELS: Record<RoadType, { label: string; icon: string; cls: string }
 
 const formatInstruction = (step: RouteStep) => {
   const { type, modifier } = step.maneuver;
-  const name = step.name || "onbekende weg";
+  const name = step.name || step.ref || "verbindingsweg";
 
   if (type === "depart") return `Vertrek via ${name}`;
   if (type === "arrive") return "Je bent aangekomen!";
