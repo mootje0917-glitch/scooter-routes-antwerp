@@ -56,6 +56,25 @@ const getManeuverIcon = (type: string, modifier?: string) => {
   return "⬆️";
 };
 
+type RoadType = "cycle" | "foot" | "road" | "unknown";
+
+const getRoadType = (name: string): RoadType => {
+  const n = (name || "").toLowerCase();
+  if (!n) return "unknown";
+  if (/(fietspad|fietsroute|fietsweg|fietsstraat|cycle)/.test(n)) return "cycle";
+  if (/(voetpad|wandelpad|voetgangers|pad$|\bpad\b|footway)/.test(n)) return "foot";
+  // Common Dutch road suffixes → regular road
+  if (/(straat|laan|weg|baan|ring|plein|kaai|brug|tunnel|dreef|steenweg|boulevard|avenue|chauss)/.test(n)) return "road";
+  return "unknown";
+};
+
+const ROAD_LABELS: Record<RoadType, { label: string; icon: string; cls: string }> = {
+  cycle:   { label: "Fietspad", icon: "🚲", cls: "bg-allowed/20 text-allowed-foreground border-allowed/40" },
+  foot:    { label: "Voetpad",  icon: "🚶", cls: "bg-warning/20 text-warning-foreground border-warning/40" },
+  road:    { label: "Weg",      icon: "🛣️", cls: "bg-secondary text-secondary-foreground border-border" },
+  unknown: { label: "Onbekend", icon: "❔", cls: "bg-muted text-muted-foreground border-border" },
+};
+
 const formatInstruction = (step: RouteStep) => {
   const { type, modifier } = step.maneuver;
   const name = step.name || "onbekende weg";
@@ -486,13 +505,24 @@ const ScooterMap = () => {
                   <p className="font-display font-semibold text-foreground text-xs leading-tight">
                     {steps[currentStep].instruction}
                   </p>
-                  {steps[currentStep].distance > 0 && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {steps[currentStep].distance < 1000
-                        ? `${Math.round(steps[currentStep].distance)} m`
-                        : `${(steps[currentStep].distance / 1000).toFixed(1)} km`}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-2 mt-1">
+                    {(() => {
+                      const rt = getRoadType(steps[currentStep].name);
+                      const meta = ROAD_LABELS[rt];
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${meta.cls}`}>
+                          <span>{meta.icon}</span>{meta.label}
+                        </span>
+                      );
+                    })()}
+                    {steps[currentStep].distance > 0 && (
+                      <p className="text-[10px] text-muted-foreground">
+                        {steps[currentStep].distance < 1000
+                          ? `${Math.round(steps[currentStep].distance)} m`
+                          : `${(steps[currentStep].distance / 1000).toFixed(1)} km`}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <span className="text-[10px] text-muted-foreground">{currentStep + 1}/{steps.length}</span>
               </div>
@@ -520,26 +550,41 @@ const ScooterMap = () => {
               </button>
             </div>
 
-            {/* Expanded: all steps */}
+            {/* Expanded: legend + all steps */}
             {instructionsExpanded && (
               <div className="flex-1 overflow-y-auto border-t border-border">
-                {steps.map((step, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentStep(i)}
-                    className={`w-full flex items-center gap-3 px-4 py-2 text-left text-xs transition-colors border-b border-border last:border-0 ${
-                      i === currentStep ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary"
-                    } ${i < currentStep ? "opacity-40" : ""}`}
-                  >
-                    <span className="text-sm flex-shrink-0">{getManeuverIcon(step.maneuver.type, step.maneuver.modifier)}</span>
-                    <span className="flex-1 min-w-0 truncate">{step.instruction}</span>
-                    {step.distance > 0 && (
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        {step.distance < 1000 ? `${Math.round(step.distance)} m` : `${(step.distance / 1000).toFixed(1)} km`}
+                <div className="flex items-center gap-2 px-4 py-2 bg-secondary/40 border-b border-border text-[10px]">
+                  <span className="text-muted-foreground">Type:</span>
+                  {(["cycle","road","foot"] as RoadType[]).map((t) => (
+                    <span key={t} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${ROAD_LABELS[t].cls}`}>
+                      <span>{ROAD_LABELS[t].icon}</span>{ROAD_LABELS[t].label}
+                    </span>
+                  ))}
+                </div>
+                {steps.map((step, i) => {
+                  const rt = getRoadType(step.name);
+                  const meta = ROAD_LABELS[rt];
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentStep(i)}
+                      className={`w-full flex items-center gap-3 px-4 py-2 text-left text-xs transition-colors border-b border-border last:border-0 ${
+                        i === currentStep ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary"
+                      } ${i < currentStep ? "opacity-40" : ""}`}
+                    >
+                      <span className="text-sm flex-shrink-0">{getManeuverIcon(step.maneuver.type, step.maneuver.modifier)}</span>
+                      <span className="flex-1 min-w-0 truncate">{step.instruction}</span>
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-medium ${meta.cls}`}>
+                        <span>{meta.icon}</span>{meta.label}
                       </span>
-                    )}
-                  </button>
-                ))}
+                      {step.distance > 0 && (
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          {step.distance < 1000 ? `${Math.round(step.distance)} m` : `${(step.distance / 1000).toFixed(1)} km`}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
