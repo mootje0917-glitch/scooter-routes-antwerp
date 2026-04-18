@@ -100,7 +100,7 @@ const formatInstruction = (step: RouteStep) => {
 const ScooterMap = () => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const routeLayerRef = useRef<L.Polyline | null>(null);
+  const routeLayerRef = useRef<L.LayerGroup | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const stepMarkerRef = useRef<L.Marker | null>(null);
   const userLocationRef = useRef<[number, number] | null>(null);
