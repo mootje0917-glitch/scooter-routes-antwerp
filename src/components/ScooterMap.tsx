@@ -56,7 +56,7 @@ const getManeuverIcon = (type: string, modifier?: string) => {
   return "⬆️";
 };
 
-type RoadType = "cycle" | "foot" | "road" | "unknown";
+type RoadType = "cycle" | "foot" | "road" | "highway" | "link" | "unknown";
 
 const getRoadType = (name: string, ref?: string): RoadType => {
   const n = (name || "").toLowerCase();
