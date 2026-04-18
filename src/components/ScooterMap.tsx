@@ -256,27 +256,35 @@ const ScooterMap = () => {
         cycle:   "hsl(160, 60%, 45%)", // groen — fietspad
         road:    "hsl(210, 80%, 55%)", // blauw — gewone weg
         foot:    "hsl(40, 90%, 55%)",  // amber — voetpad
-        unknown: "hsl(210, 12%, 55%)", // grijs
+        highway: "hsl(0, 72%, 55%)",   // rood — verboden
+        link:    "hsl(210, 12%, 55%)", // grijs — verbinding
+        unknown: "hsl(210, 12%, 55%)",
       };
 
-      // Build per-step colored polylines
+      // Build per-step colored polylines + detect highway segments
       const group = L.layerGroup();
+      let hasHighway = false;
       route.legs[0].steps.forEach((s: any) => {
         const segCoords: [number, number][] = (s.geometry?.coordinates || []).map(
           (c: [number, number]) => [c[1], c[0]]
         );
         if (segCoords.length < 2) return;
-        const rt = getRoadType(s.name || "");
+        const rt = getRoadType(s.name || "", s.ref);
+        if (rt === "highway") hasHighway = true;
         L.polyline(segCoords, {
           color: ROAD_COLORS[rt],
           weight: 6,
           opacity: 0.9,
           lineJoin: "round",
           lineCap: "round",
+          dashArray: rt === "highway" ? "8 6" : undefined,
         }).addTo(group);
       });
       group.addTo(mapRef.current);
       routeLayerRef.current = group;
+      if (hasHighway) {
+        setError("⚠ Deze route bevat een snelweg/autostrade — niet toegelaten voor scooters.");
+      }
 
       const startIcon = L.divIcon({
         html: `<div style="width:20px;height:20px;background:hsl(160,60%,45%);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>`,
