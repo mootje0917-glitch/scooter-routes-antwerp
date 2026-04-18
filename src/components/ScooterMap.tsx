@@ -242,8 +242,9 @@ const ScooterMap = () => {
     if (stepMarkerRef.current) { mapRef.current.removeLayer(stepMarkerRef.current); stepMarkerRef.current = null; }
 
     try {
+      // OSM-DE routed-bike: echte fiets-profiel, vermijdt snelwegen/autostrades
       const res = await fetch(
-        `https://router.project-osrm.org/route/v1/bike/${fromCoord[1]},${fromCoord[0]};${toCoord[1]},${toCoord[0]}?overview=full&geometries=geojson&steps=true`
+        `https://routing.openstreetmap.de/routed-bike/route/v1/bike/${fromCoord[1]},${fromCoord[0]};${toCoord[1]},${toCoord[0]}?overview=full&geometries=geojson&steps=true`
       );
       const data = await res.json();
       if (data.code !== "Ok" || !data.routes?.length) {
