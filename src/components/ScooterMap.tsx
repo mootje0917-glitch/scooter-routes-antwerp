@@ -608,7 +608,7 @@ const ScooterMap = () => {
                   ))}
                 </div>
                 {steps.map((step, i) => {
-                  const rt = getRoadType(step.name);
+                  const rt = getRoadType(step.name, step.ref);
                   const meta = ROAD_LABELS[rt];
                   return (
                     <button
