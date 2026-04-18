@@ -312,6 +312,7 @@ const ScooterMap = () => {
         distance: s.distance,
         duration: s.duration,
         name: s.name || "",
+        ref: s.ref || undefined,
         maneuver: s.maneuver,
         coord: [s.maneuver.location[1], s.maneuver.location[0]] as [number, number],
       }));
