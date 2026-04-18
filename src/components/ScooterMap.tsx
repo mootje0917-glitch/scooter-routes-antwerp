@@ -56,6 +56,25 @@ const getManeuverIcon = (type: string, modifier?: string) => {
   return "⬆️";
 };
 
+type RoadType = "cycle" | "foot" | "road" | "unknown";
+
+const getRoadType = (name: string): RoadType => {
+  const n = (name || "").toLowerCase();
+  if (!n) return "unknown";
+  if (/(fietspad|fietsroute|fietsweg|fietsstraat|cycle)/.test(n)) return "cycle";
+  if (/(voetpad|wandelpad|voetgangers|pad$|\bpad\b|footway)/.test(n)) return "foot";
+  // Common Dutch road suffixes → regular road
+  if (/(straat|laan|weg|baan|ring|plein|kaai|brug|tunnel|dreef|steenweg|boulevard|avenue|chauss)/.test(n)) return "road";
+  return "unknown";
+};
+
+const ROAD_LABELS: Record<RoadType, { label: string; icon: string; cls: string }> = {
+  cycle:   { label: "Fietspad", icon: "🚲", cls: "bg-allowed/20 text-allowed-foreground border-allowed/40" },
+  foot:    { label: "Voetpad",  icon: "🚶", cls: "bg-warning/20 text-warning-foreground border-warning/40" },
+  road:    { label: "Weg",      icon: "🛣️", cls: "bg-secondary text-secondary-foreground border-border" },
+  unknown: { label: "Onbekend", icon: "❔", cls: "bg-muted text-muted-foreground border-border" },
+};
+
 const formatInstruction = (step: RouteStep) => {
   const { type, modifier } = step.maneuver;
   const name = step.name || "onbekende weg";
