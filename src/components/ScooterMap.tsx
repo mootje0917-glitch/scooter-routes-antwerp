@@ -553,7 +553,7 @@ const ScooterMap = () => {
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     {(() => {
-                      const rt = getRoadType(steps[currentStep].name);
+                      const rt = getRoadType(steps[currentStep].name, steps[currentStep].ref);
                       const meta = ROAD_LABELS[rt];
                       return (
                         <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${meta.cls}`}>
