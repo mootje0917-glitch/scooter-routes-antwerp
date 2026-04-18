@@ -38,6 +38,7 @@ interface RouteStep {
   distance: number;
   duration: number;
   name: string;
+  ref?: string;
   maneuver: { type: string; modifier?: string };
   coord: [number, number];
 }
