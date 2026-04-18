@@ -58,21 +58,25 @@ const getManeuverIcon = (type: string, modifier?: string) => {
 
 type RoadType = "cycle" | "foot" | "road" | "unknown";
 
-const getRoadType = (name: string): RoadType => {
+const getRoadType = (name: string, ref?: string): RoadType => {
   const n = (name || "").toLowerCase();
-  if (!n) return "unknown";
+  const r = (ref || "").toLowerCase();
+  // Snelweg / autostrade detectie via ref (E17, A12, R1, N1...)
+  if (/^(e\d+|a\d+|r\d+)$/.test(r.trim())) return "highway";
+  if (!n && !r) return "link";
   if (/(fietspad|fietsroute|fietsweg|fietsstraat|cycle)/.test(n)) return "cycle";
-  if (/(voetpad|wandelpad|voetgangers|pad$|\bpad\b|footway)/.test(n)) return "foot";
-  // Common Dutch road suffixes → regular road
-  if (/(straat|laan|weg|baan|ring|plein|kaai|brug|tunnel|dreef|steenweg|boulevard|avenue|chauss)/.test(n)) return "road";
-  return "unknown";
+  if (/(voetpad|wandelpad|voetgangers|footway)/.test(n)) return "foot";
+  if (/(straat|laan|weg|baan|ring|plein|kaai|brug|tunnel|dreef|steenweg|boulevard|avenue|chauss|lei|markt|hof|dijk)/.test(n)) return "road";
+  return "link";
 };
 
 const ROAD_LABELS: Record<RoadType, { label: string; icon: string; cls: string }> = {
-  cycle:   { label: "Fietspad", icon: "🚲", cls: "bg-allowed/20 text-allowed-foreground border-allowed/40" },
-  foot:    { label: "Voetpad",  icon: "🚶", cls: "bg-warning/20 text-warning-foreground border-warning/40" },
-  road:    { label: "Weg",      icon: "🛣️", cls: "bg-secondary text-secondary-foreground border-border" },
-  unknown: { label: "Onbekend", icon: "❔", cls: "bg-muted text-muted-foreground border-border" },
+  cycle:   { label: "Fietspad",  icon: "🚲", cls: "bg-allowed/20 text-allowed-foreground border-allowed/40" },
+  foot:    { label: "Voetpad",   icon: "🚶", cls: "bg-warning/20 text-warning-foreground border-warning/40" },
+  road:    { label: "Weg",       icon: "🛣️", cls: "bg-secondary text-secondary-foreground border-border" },
+  highway: { label: "Snelweg ⚠", icon: "🚫", cls: "bg-destructive/20 text-destructive border-destructive/40" },
+  link:    { label: "Verbinding",icon: "↪️", cls: "bg-muted text-muted-foreground border-border" },
+  unknown: { label: "Onbekend",  icon: "❔", cls: "bg-muted text-muted-foreground border-border" },
 };
 
 const formatInstruction = (step: RouteStep) => {
