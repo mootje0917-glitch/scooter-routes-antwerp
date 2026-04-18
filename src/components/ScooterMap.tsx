@@ -337,7 +337,13 @@ const ScooterMap = () => {
   const stopNavigation = () => {
     setNavigating(false); setCurrentStep(0);
     if (stepMarkerRef.current && mapRef.current) { mapRef.current.removeLayer(stepMarkerRef.current); stepMarkerRef.current = null; }
-    if (routeLayerRef.current && mapRef.current) mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [80, 80] });
+    if (routeLayerRef.current && mapRef.current) {
+      const bounds = L.latLngBounds([]);
+      routeLayerRef.current.eachLayer((layer) => {
+        if (layer instanceof L.Polyline) bounds.extend(layer.getBounds());
+      });
+      if (bounds.isValid()) mapRef.current.fitBounds(bounds, { padding: [80, 80] });
+    }
     setPanelMinimized(false);
   };
   const nextStep = () => { if (currentStep < steps.length - 1) setCurrentStep((s) => s + 1); };
