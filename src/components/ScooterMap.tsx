@@ -505,13 +505,24 @@ const ScooterMap = () => {
                   <p className="font-display font-semibold text-foreground text-xs leading-tight">
                     {steps[currentStep].instruction}
                   </p>
-                  {steps[currentStep].distance > 0 && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {steps[currentStep].distance < 1000
-                        ? `${Math.round(steps[currentStep].distance)} m`
-                        : `${(steps[currentStep].distance / 1000).toFixed(1)} km`}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-2 mt-1">
+                    {(() => {
+                      const rt = getRoadType(steps[currentStep].name);
+                      const meta = ROAD_LABELS[rt];
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${meta.cls}`}>
+                          <span>{meta.icon}</span>{meta.label}
+                        </span>
+                      );
+                    })()}
+                    {steps[currentStep].distance > 0 && (
+                      <p className="text-[10px] text-muted-foreground">
+                        {steps[currentStep].distance < 1000
+                          ? `${Math.round(steps[currentStep].distance)} m`
+                          : `${(steps[currentStep].distance / 1000).toFixed(1)} km`}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <span className="text-[10px] text-muted-foreground">{currentStep + 1}/{steps.length}</span>
               </div>
