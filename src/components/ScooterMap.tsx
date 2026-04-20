@@ -57,18 +57,22 @@ const getManeuverIcon = (type: string, modifier?: string) => {
   return "⬆️";
 };
 
-type RoadType = "cycle" | "foot" | "road" | "highway" | "link" | "unknown";
+type RoadType = "cycle" | "foot" | "road" | "highway";
 
 const getRoadType = (name: string, ref?: string): RoadType => {
-  const n = (name || "").toLowerCase();
-  const r = (ref || "").toLowerCase();
-  // Snelweg / autostrade detectie via ref (E17, A12, R1, N1...)
-  if (/^(e\d+|a\d+|r\d+)$/.test(r.trim())) return "highway";
-  if (!n && !r) return "link";
-  if (/(fietspad|fietsroute|fietsweg|fietsstraat|cycle)/.test(n)) return "cycle";
-  if (/(voetpad|wandelpad|voetgangers|footway)/.test(n)) return "foot";
-  if (/(straat|laan|weg|baan|ring|plein|kaai|brug|tunnel|dreef|steenweg|boulevard|avenue|chauss|lei|markt|hof|dijk)/.test(n)) return "road";
-  return "link";
+  const n = (name || "").toLowerCase().trim();
+  const r = (ref || "").toLowerCase().trim();
+  // Snelweg / autostrade (E17, A12, R1, N1...)
+  if (/^(e\d+|a\d+|r\d+|n\d+)$/.test(r)) return "highway";
+  // Expliciete voetpaden
+  if (/(voetpad|wandelpad|voetgangers|footway|trottoir)/.test(n)) return "foot";
+  // Expliciete fietspaden
+  if (/(fietspad|fietsroute|fietsweg|fietsstraat|jaagpad|cycle)/.test(n)) return "cycle";
+  // Duidelijke autowegen (straat, laan, steenweg, ring, brug, tunnel...)
+  if (/(straat|laan|baan|ring|kaai|brug|tunnel|steenweg|boulevard|avenue|chauss|lei|markt|plein|hof|dijk|singel)/.test(n)) return "road";
+  // Onbekend / kort verbindingssegment / pad → behandel als fietspad
+  // (OSRM routed-bike kiest fietsinfra, en die heeft vaak geen straatnaam)
+  return "cycle";
 };
 
 const ROAD_LABELS: Record<RoadType, { label: string; icon: string; cls: string }> = {
@@ -76,8 +80,6 @@ const ROAD_LABELS: Record<RoadType, { label: string; icon: string; cls: string }
   foot:    { label: "Voetpad",   icon: "🚶", cls: "bg-warning/20 text-warning-foreground border-warning/40" },
   road:    { label: "Weg",       icon: "🛣️", cls: "bg-secondary text-secondary-foreground border-border" },
   highway: { label: "Snelweg ⚠", icon: "🚫", cls: "bg-destructive/20 text-destructive border-destructive/40" },
-  link:    { label: "Verbinding",icon: "↪️", cls: "bg-muted text-muted-foreground border-border" },
-  unknown: { label: "Onbekend",  icon: "❔", cls: "bg-muted text-muted-foreground border-border" },
 };
 
 const formatInstruction = (step: RouteStep) => {
@@ -259,8 +261,6 @@ const ScooterMap = () => {
         road:    "hsl(210, 80%, 55%)", // blauw — gewone weg
         foot:    "hsl(40, 90%, 55%)",  // amber — voetpad
         highway: "hsl(0, 72%, 55%)",   // rood — verboden
-        link:    "hsl(210, 12%, 55%)", // grijs — verbinding
-        unknown: "hsl(210, 12%, 55%)",
       };
 
       // Build per-step colored polylines + detect highway segments
