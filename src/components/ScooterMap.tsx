@@ -261,8 +261,6 @@ const ScooterMap = () => {
         road:    "hsl(210, 80%, 55%)", // blauw — gewone weg
         foot:    "hsl(40, 90%, 55%)",  // amber — voetpad
         highway: "hsl(0, 72%, 55%)",   // rood — verboden
-        link:    "hsl(210, 12%, 55%)", // grijs — verbinding
-        unknown: "hsl(210, 12%, 55%)",
       };
 
       // Build per-step colored polylines + detect highway segments
