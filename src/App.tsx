@@ -47,8 +47,9 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/profiel" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          {/* TIJDELIJK: ProtectedRoute uitgeschakeld wegens Lovable Cloud downtime */}
+          <Route path="/" element={<Index />} />
+          <Route path="/profiel" element={<ProfilePage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
