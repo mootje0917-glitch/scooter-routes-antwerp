@@ -79,7 +79,7 @@ const getRoadType = (name: string, ref?: string): RoadType => {
     /^(n\d+|r\d+)$/.test(r) || 
     /(steenweg|singel|boulevard|laan)/.test(n)
   ) {
-    return "cycle"; // Markeer als fietspad (dus rood)
+    return "cycle"; // Mar keer als fietspad (dus rood)
   }
 
   // 5. KLEINERE, LOKALE WEGEN
