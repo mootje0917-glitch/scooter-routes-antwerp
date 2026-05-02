@@ -62,16 +62,31 @@ type RoadType = "cycle" | "foot" | "road" | "highway";
 const getRoadType = (name: string, ref?: string): RoadType => {
   const n = (name || "").toLowerCase().trim();
   const r = (ref || "").toLowerCase().trim();
-  // Snelweg / autostrade (E17, A12, R1, N1...)
-  if (/^(e\d+|a\d+|r\d+|n\d+)$/.test(r)) return "highway";
-  // Expliciete voetpaden
-  if (/(voetpad|wandelpad|voetgangers|footway|trottoir)/.test(n)) return "foot";
-  // Expliciete fietspaden
+
+  // 1. EXPLICIETE FIETSPADEN OF JAAGPADEN
   if (/(fietspad|fietsroute|fietsweg|fietsstraat|jaagpad|cycle)/.test(n)) return "cycle";
-  // Duidelijke autowegen (straat, laan, steenweg, ring, brug, tunnel...)
-  if (/(straat|laan|baan|ring|kaai|brug|tunnel|steenweg|boulevard|avenue|chauss|lei|markt|plein|hof|dijk|singel)/.test(n)) return "road";
-  // Onbekend / kort verbindingssegment / pad → behandel als fietspad
-  // (OSRM routed-bike kiest fietsinfra, en die heeft vaak geen straatnaam)
+
+  // 2. EXPLICIETE VOETPADEN (soms gebruikt om fietsers te routeren als ze moeten afstappen)
+  if (/(voetpad|wandelpad|voetgangers|footway|trottoir)/.test(n)) return "foot";
+
+  // 3. ECHTE SNELWEGEN (E- en A-wegen zijn illegaal voor scooters)
+  if (/^(e\d+|a\d+)$/.test(r)) return "highway";
+
+  // 4. BELANGRIJKE ASSEN MET FIETSPADEN (De "Slimme" Regel)
+  // Als de fiets-router ons over een N-weg, R-weg, Singel of Steenweg stuurt,
+  // rijden we in de praktijk (verplicht) op het aanliggende fietspad.
+  if (
+    /^(n\d+|r\d+)$/.test(r) || 
+    /(steenweg|singel|boulevard|laan)/.test(n)
+  ) {
+    return "cycle"; // Markeer als fietspad (dus rood)
+  }
+
+  // 5. KLEINERE, LOKALE WEGEN
+  // Gewone straten, leien, pleinen waar je vaak wél gewoon op straat rijdt.
+  if (/(straat|lei|baan|ring|kaai|brug|tunnel|avenue|chauss|markt|plein|hof|dijk)/.test(n)) return "road";
+
+  // 6. ONBEKENDE SEGMENTEN (vaak fietspaden zonder naam)
   return "cycle";
 };
 
@@ -244,35 +259,59 @@ const ScooterMap = () => {
     if (stepMarkerRef.current) { mapRef.current.removeLayer(stepMarkerRef.current); stepMarkerRef.current = null; }
 
     try {
-      // OSM-DE routed-bike: echte fiets-profiel, vermijdt snelwegen/autostrades
+     // 1. Vraag om alternatieven door '&alternatives=3' toe te voegen aan de URL
       const res = await fetch(
-        `https://routing.openstreetmap.de/routed-bike/route/v1/bike/${fromCoord[1]},${fromCoord[0]};${toCoord[1]},${toCoord[0]}?overview=full&geometries=geojson&steps=true`
+        `https://routing.openstreetmap.de/routed-bike/route/v1/bike/${fromCoord[1]},${fromCoord[0]};${toCoord[1]},${toCoord[0]}?overview=full&geometries=geojson&steps=true&alternatives=3`
       );
       const data = await res.json();
       if (data.code !== "Ok" || !data.routes?.length) {
         setError("Geen route gevonden."); setLoading(false); return;
       }
 
-      const route = data.routes[0];
+      // 2. Zoek automatisch naar een veilige alternatieve route
+      let safeRoute = null;
+      let isUnsafe = false;
 
-      // Color map per road type (HSL from design tokens)
+      for (const possibleRoute of data.routes) {
+        let highwayFound = false;
+        // Check alle stappen in deze specifieke route
+        possibleRoute.legs[0].steps.forEach((s: any) => {
+          if (getRoadType(s.name || "", s.ref) === "highway") {
+            highwayFound = true;
+          }
+        });
+
+        // Als we GEEN snelweg hebben gevonden in deze route, kiezen we deze!
+        if (!highwayFound) {
+          safeRoute = possibleRoute;
+          break; // Stop met zoeken, we hebben een goede route.
+        }
+      }
+
+      // 3. Fallback: Als we in een onmogelijke situatie zitten waar elke route een snelweg heeft
+      if (!safeRoute) {
+        safeRoute = data.routes[0];
+        isUnsafe = true;
+      }
+
+      // 4. Gebruik de gekozen veilige route
+      const route = safeRoute;
+
       const ROAD_COLORS: Record<RoadType, string> = {
-        cycle:   "hsl(160, 60%, 45%)", // groen — fietspad
-        road:    "hsl(210, 80%, 55%)", // blauw — gewone weg
-        foot:    "hsl(40, 90%, 55%)",  // amber — voetpad
-        highway: "hsl(0, 72%, 55%)",   // rood — verboden
+        cycle:   "#FF3B30", // Jouw nieuwe felle rood!
+        road:    "hsl(210, 80%, 55%)",
+        foot:    "hsl(40, 90%, 55%)",
+        highway: "hsl(0, 72%, 55%)",
       };
 
-      // Build per-step colored polylines + detect highway segments
       const group = L.layerGroup();
-      let hasHighway = false;
       route.legs[0].steps.forEach((s: any) => {
         const segCoords: [number, number][] = (s.geometry?.coordinates || []).map(
           (c: [number, number]) => [c[1], c[0]]
         );
         if (segCoords.length < 2) return;
         const rt = getRoadType(s.name || "", s.ref);
-        if (rt === "highway") hasHighway = true;
+        
         L.polyline(segCoords, {
           color: ROAD_COLORS[rt],
           weight: 6,
@@ -284,18 +323,31 @@ const ScooterMap = () => {
       });
       group.addTo(mapRef.current);
       routeLayerRef.current = group;
-      if (hasHighway) {
-        setError("⚠ Deze route bevat een snelweg/autostrade — niet toegelaten voor scooters.");
+
+      // 5. Toon de foutmelding alleen als we écht geen alternatief konden vinden
+      if (isUnsafe) {
+        setError("⚠ Geen veilige omleiding gevonden. Deze route bevat een snelweg/autostrade!");
       }
+      
 
       const startIcon = L.divIcon({
         html: `<div style="width:20px;height:20px;background:hsl(160,60%,45%);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>`,
         iconSize: [20, 20], iconAnchor: [10, 10], className: "",
       });
       const endIcon = L.divIcon({
-        html: `<div style="width:20px;height:20px;background:hsl(0,72%,55%);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>`,
-        iconSize: [20, 20], iconAnchor: [10, 10], className: "",
-      });
+  html: `
+    <div style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));">
+      <svg viewBox="0 0 24 24" fill="#ffe730" stroke="white" stroke-width="1.5" style="width: 100%; height: 100%;">
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v19" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  `,
+  iconSize: [26, 26],
+  // We verankeren het icoon op [13, 26], dat is het midden van de onderkant
+  // (precies waar de vlaggenstok de grond raakt).
+  iconAnchor: [13, 26], 
+  className: "",
+});
 
       markersRef.current.push(
         L.marker(fromCoord, { icon: startIcon }).addTo(mapRef.current).bindPopup("🛴 Start"),
@@ -333,17 +385,46 @@ const ScooterMap = () => {
   }, [fromCoord, toCoord, calculateRoute]);
 
   // Navigation: zoom to current step
+  // Navigation: zoom tightly and show rotating GPS arrow
   useEffect(() => {
     if (!navigating || !mapRef.current || steps.length === 0) return;
     const step = steps[currentStep];
     if (!step) return;
+
+    // 1. Calculate the angle to the next step
+    let angle = 0;
+    if (currentStep < steps.length - 1) {
+      const currentLoc = step.coord;
+      const nextLoc = steps[currentStep + 1].coord;
+      const dy = nextLoc[1] - currentLoc[1];
+      const dx = nextLoc[0] - currentLoc[0];
+      // Convert to degrees and adjust for compass heading
+      angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    }
+
     if (stepMarkerRef.current) mapRef.current.removeLayer(stepMarkerRef.current);
+
+    // 2. Create the sleek 3D-looking GPS Arrow
     const icon = L.divIcon({
-      html: `<div style="width:32px;height:32px;background:hsl(160,60%,45%);border:3px solid white;border-radius:50%;box-shadow:0 3px 12px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:16px">${getManeuverIcon(step.maneuver.type, step.maneuver.modifier)}</div>`,
-      iconSize: [32, 32], iconAnchor: [16, 16], className: "",
+      html: `
+        <div style="transform: rotate(${angle}deg); transition: transform 0.5s ease-out; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.4));">
+         <svg viewBox="0 0 24 24" fill="#FFCC00" stroke="black" stroke-width="2" style="width: 100%; height: 100%;">
+  <path d="M12 2L2 22l10-4 10 4L12 2z" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
+        </div>
+      `,
+      iconSize: [48, 48],
+      iconAnchor: [24, 24], 
+      className: "", // removes default leaflet background
     });
+
     stepMarkerRef.current = L.marker(step.coord, { icon }).addTo(mapRef.current);
-    mapRef.current.flyTo(step.coord, 17, { duration: 0.8 });
+    
+    // 3. Zoom in much tighter (level 19) for that "Street View" GPS feel
+    mapRef.current.flyTo(step.coord, 19, { 
+      duration: 1.2, 
+      easeLinearity: 0.25 
+    });
   }, [navigating, currentStep, steps]);
 
   const startNavigation = () => {
